@@ -7,4 +7,4 @@ Code related to paper "Semi-supervised Deep networks for plasma state identifica
 
 ## Training
 
-## Evaluation
+## Evaluation
