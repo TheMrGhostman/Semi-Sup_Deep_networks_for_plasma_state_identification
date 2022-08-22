@@ -1,1 +1,1 @@
-Currently we are working on getting permission to publish data (dataset) used for experiments
+Currently, we are working on obtaining permission to publish data (dataset) used for experiments.
