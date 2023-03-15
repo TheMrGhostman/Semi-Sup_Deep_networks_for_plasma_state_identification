@@ -74,8 +74,8 @@ def load_and_preprocess(
 		scale=False, label_idx=80, seed=666, verbose=True
 	):
 	path = os.path.join(path,"data/dataset/")
-	sup_dataset = filter(lambda x: ".csv" in x, os.listdir(os.path.join(path, "supervised")))
-	unsup_dataset = filter(lambda x: ".csv" in x,os.listdir(os.path.join(path, "unsupervised")))
+	sup_dataset = list(filter(lambda x: ".csv" in x, os.listdir(os.path.join(path, "supervised"))))
+	unsup_dataset = list(filter(lambda x: ".csv" in x,os.listdir(os.path.join(path, "unsupervised"))))
 
 	X_s, Y, X_u = [], [], []
 	if verbose:
