@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 from utils.losses import Gaussian_NLL
 from utils.ssvae import SSVAE, q_zxy, q_zx, SSVAE_Trainer
-from utils.datasets import load_and_preprocess_new, load_and_preprocess_special
+from utils.datasets import load_and_preprocess
 from utils.inception import Inception, InceptionBlock, correct_sizes
 from utils.models import inception_time, vae
 from utils.utils import SWISH, get_activation, H_alpha_only, acc_tst
@@ -36,7 +36,7 @@ options = parser.parse_args()
 print(options)
 
 # DATA
-data_loaders = load_and_preprocess_new(
+data_loaders = load_and_preprocess(
 	mode="semisup", 
     transform=H_alpha_only() if options.halpha=="True" else None,
 	batch_size=options.batch_size, 

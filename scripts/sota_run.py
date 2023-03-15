@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F 
 from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, cohen_kappa_score
 
-from utils.datasets import load_and_preprocess_new
+from utils.datasets import load_and_preprocess
 
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -27,7 +27,7 @@ options = parser.parse_args()
 print(options)
 
 
-data_loaders = load_and_preprocess_new(
+data_loaders = load_and_preprocess(
 	mode="sup", 
 	batch_size=options.batch_size, 
 	validation=True, 

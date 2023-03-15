@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F 
 
 from utils.inference import Trainer
-from utils.datasets import load_and_preprocess_new
+from utils.datasets import load_and_preprocess
 from utils.inception import Inception, InceptionBlock, correct_sizes
 from utils.models import inception_time
 from utils.utils import SWISH, get_activation, H_alpha_only, acc_tst
@@ -32,7 +32,7 @@ parser.add_argument("--seed", type=int, default=666, help="validation split seed
 options = parser.parse_args()
 print(options)
 
-data_loaders = load_and_preprocess_new(
+data_loaders = load_and_preprocess(
 	mode="sup", 
 	transform=H_alpha_only() if options.halpha=="True" else None,
 	batch_size=options.batch_size, 
