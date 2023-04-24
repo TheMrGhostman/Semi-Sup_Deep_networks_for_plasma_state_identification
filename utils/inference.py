@@ -132,8 +132,8 @@ class Trainer(nn.Module):
 						wandb.log({"Training/Loss": loss.detach().item()})
 
 			validation_loss=0
-			acc = []
-			conf_matrix = None
+			preds = []
+			ground_trues = []
 			self.model.eval()
 			with torch.no_grad():
 				for j, (validation_sample, y_valid_true) in enumerate(validation_loader, 0):
@@ -145,10 +145,14 @@ class Trainer(nn.Module):
 
 					y_argmax = torch.argmax(y_valid_pred.cpu().detach(), axis=1)
 					y_detach = y_valid_true.cpu().detach()
+					preds.append(y_argmax)
+					ground_trues.append(y_detach)
 
-					acc.append(accuracy_score(y_detach, y_argmax))
-					cm = confusion_matrix(y_detach, y_argmax)
-					conf_matrix = conf_matrix + cm if not isinstance(conf_matrix, type(None)) else cm
+			preds = torch.cat(preds, axis=0)
+			ground_trues = torch.cat(ground_trues, axis=0)	
+			acc = accuracy_score(ground_trues, preds)
+			conf_matrix = confusion_matrix(ground_trues, preds)
+			f1_macro = f1_score(ground_trues, preds, average="macro")
 
 
 			validation_loss /= len(validation_loader)
@@ -157,7 +161,12 @@ class Trainer(nn.Module):
 			self.loss_history["val_accuracy"].append(acc)
 			if self.tensorboard:
 				tab = wandb.Table(columns=["pred-"+str(kk) for kk in range(conf_matrix.shape[0])], data=conf_matrix.tolist())#.tolist()
-				wandb.log({"epoch": epoch, "Validation/Loss": validation_loss, "Validation/Accuracy": acc, "Validation/Confusion_Matrix": tab})
+				wandb.log(
+					{"epoch": epoch, 
+      				"Validation/Loss": validation_loss, 
+	       			"Validation/Accuracy": acc,
+				    "Validation/F1_score": f1_macro, 
+					"Validation/Confusion_Matrix": tab})
 
 			if self.verbose:
 				print("Epoch [{}/{}], average_loss:{:.4f}, validation_loss:{:.4f}, val_accuracy:{:,.4f}"\

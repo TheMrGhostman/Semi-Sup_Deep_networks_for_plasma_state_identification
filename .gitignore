@@ -4,3 +4,4 @@
 utils/datasets_old.py
 utils/debugging.ipynb
 wandb
+checkpoints
