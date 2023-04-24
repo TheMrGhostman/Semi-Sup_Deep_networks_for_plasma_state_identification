@@ -150,8 +150,6 @@ class Trainer(nn.Module):
 
 			preds = torch.cat(preds, axis=0)
 			ground_trues = torch.cat(ground_trues, axis=0)	
-			pr = copy.deepcopy(preds)
-			gr = copy.deepcopy(ground_trues)
 			acc = accuracy_score(ground_trues, preds)
 			f1_macro = f1_score(ground_trues, preds, average="macro")
 
