@@ -7,10 +7,11 @@ import numpy as np
 import torch 
 import torch.nn as nn
 import torch.nn.functional as F 
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
+import wandb
 
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 
 from .losses import Gaussian_NLL, gaussian_nll, sample_mse
 from .utils import EarlyStopping
@@ -52,25 +53,22 @@ class Trainer(nn.Module):
 		self.loss_history = {"train":[], "validation":[], "val_accuracy":[]} # maybe rather "model_info"
 
 		#optional params
-		if kwargs.get("tensorboard") == True:
+		if kwargs.get("tensorboard") == True: 
 			self.tensorboard = True
-			if kwargs.get("model_name")!= None:
-				self.tb = SummaryWriter(comment=kwargs.get("model_name"))
-			else:
-				self.tb = SummaryWriter()
 		else: 
 			self.tensorboard = False
 
 		if kwargs.get("early_stopping") != None:
 			self.early_stopping = EarlyStopping(kwargs.get("early_stopping"))
-			if kwargs.get("save_path") != None:
-				self.save_path = kwargs.get("save_path")
-			else:
-				self.save_path = "checkpoints"
-				if not os.path.exists("checkpoints"):
-					os.makedirs("checkpoints")
 		else:
 			self.early_stopping = None
+
+		if kwargs.get("save_path") != None:
+			self.save_path = kwargs.get("save_path")
+		else:
+			self.save_path = "checkpoints"
+			if not os.path.exists("checkpoints"):
+				os.makedirs("checkpoints")
 
 		if kwargs.get("save_every") != None:
 			self.save_every = (kwargs.get("save_every"), True)
@@ -84,7 +82,7 @@ class Trainer(nn.Module):
 			self.save_every = (0, False)
 
 		self.model_name = datetime.now().strftime("%d-%m-%Y--%H-%M-%S--") if kwargs.get("model_name")==None \
-			else datetime.now().strftime("%d-%m-%Y--%H-%M-%S--") + kwargs.get("model_name")
+			else kwargs.get("model_name")
 		self.device = kwargs.get("set_device") if kwargs.get("set_device")!=None \
 			else torch.device("cuda" if torch.cuda.is_available() else "cpu")
 		self.model.to(self.device)
@@ -92,32 +90,9 @@ class Trainer(nn.Module):
 
 		print(self.device) 
 
-	def tensorboard_save(self, epoch, tr_loss, val_loss, acc=None):
-		"""
-		function for saving informations to tensorboard
-		"""
-		self.tb.add_scalar("Loss/train", tr_loss, epoch)
-		self.tb.add_scalar("Loss/validation", val_loss, epoch)
-		"""
-		for i in range(len(self.model.model)-1): # iteration through layers
-			self.tb.add_histogram(f"layer_{i}/wight", self.model.model[i].layer.weight, epoch)
-			self.tb.add_histogram(f"layer_{i}/bias", self.model.model[i].layer.bias, epoch)
-			self.tb.add_histogram(f"layer_{i}/wight_grad", self.model.model[i].layer.weight.grad, epoch)
-			self.tb.add_histogram(f"layer_{i}/bias_grad", self.model.model[i].layer.bias.grad, epoch)
-		"""
-		if acc!=None:
-			self.tb.add_scalar("Accurary/validation", acc, epoch)
-
-	def tensorboard_graph(self, x):
-		if isinstance(self.model, nn.Sequential):
-			self.tb.add_graph(self.model, x)
-		elif hasattr(self.model, 'model') and isinstance(self.model.model, nn.Sequential):
-			self.tb.add_graph(self.model.model, x)
-		else:
-			self.tb.add_graph(self.model, x)
 
 	def early_stopping_save(self, epoch):
-		es_epoch = epoch-(self.early_stopping.global_patience - self.early_stopping.current_patience)
+		es_epoch = epoch - (self.early_stopping.global_patience - self.early_stopping.current_patience)
 		torch.save(self.early_stopping.best_model, f"{self.save_path}/{self.model_name}_epoch={es_epoch}_early-stop.pt")
 		self.loss_history["early_stopping"] = {
 			"epoch_idx": es_epoch, 
@@ -151,13 +126,14 @@ class Trainer(nn.Module):
 				loss.backward()
 				self.optimizer.step()
 				#=================log====================
-				if ((i + 1) % print_every == 0): # and isinstance(history_train_loss, list)
+				if ((i + 1) % print_every == 0): 
 					self.loss_history["train"].append(loss.item())
-					if self.tensorboard and epoch==0:
-						self.tensorboard_graph(train_sample)
+					if self.tensorboard:
+						wandb.log({"Training/Loss": loss.detach().item()})
 
 			validation_loss=0
 			acc = []
+			conf_matrix = None
 			self.model.eval()
 			with torch.no_grad():
 				for j, (validation_sample, y_valid_true) in enumerate(validation_loader, 0):
@@ -166,12 +142,22 @@ class Trainer(nn.Module):
 					y_valid_pred = self.model.forward(validation_sample)
 
 					validation_loss += self.loss_fn(y_valid_pred, y_valid_true).detach().item()
-					acc.append(accuracy_score(y_valid_true.cpu().detach(), torch.argmax(y_valid_pred.cpu().detach(), axis=1)))
+
+					y_argmax = torch.argmax(y_valid_pred.cpu().detach(), axis=1)
+					y_detach = y_valid_true.cpu().detach()
+
+					acc.append(accuracy_score(y_detach, y_argmax))
+					cm = confusion_matrix(y_detach, y_argmax)
+					conf_matrix = conf_matrix + cm if not isinstance(conf_matrix, type(None)) else cm
+
 
 			validation_loss /= len(validation_loader)
 			self.loss_history["validation"].append(validation_loss)
 			acc = np.mean(acc)
 			self.loss_history["val_accuracy"].append(acc)
+			if self.tensorboard:
+				tab = wandb.Table(columns=["pred-"+str(kk) for kk in range(conf_matrix.shape[0])], data=conf_matrix.tolist())#.tolist()
+				wandb.log({"epoch": epoch, "Validation/Loss": validation_loss, "Validation/Accuracy": acc, "Validation/Confusion_Matrix": tab})
 
 			if self.verbose:
 				print("Epoch [{}/{}], average_loss:{:.4f}, validation_loss:{:.4f}, val_accuracy:{:,.4f}"\
@@ -182,9 +168,6 @@ class Trainer(nn.Module):
 				if self.early_stopping != None:
 					self.early_stopping_save(epoch+1)
 				return self.loss_history
-
-			if self.tensorboard:
-				self.tensorboard_save(epoch=epoch, tr_loss=train_loss/n_batches, val_loss=validation_loss, acc=acc)
 
 			if self.scheduler!=None:
 				self.scheduler.step()
@@ -199,7 +182,9 @@ class Trainer(nn.Module):
 					self.early_stopping_save(epoch+1)
 					return self.loss_history
 					
-		self.early_stopping_save(epoch+1)
+		if self.early_stopping != None:
+			self.early_stopping_save(epoch+1)
+		
 		torch.save(self.model.state_dict(), f"{self.save_path}/{self.model_name}_epoch={epoch+1}_end.pt")
 		return self.loss_history
 	
@@ -230,8 +215,8 @@ class Trainer(nn.Module):
 				#=================log====================
 				if ((i + 1) % print_every == 0): # and isinstance(history_train_loss, list)
 					self.loss_history["train"].append(loss.item())
-					if self.tensorboard and epoch==0:
-						self.tensorboard_graph(train_sample)
+					if self.tensorboard:
+						wandb.log({"Training/Loss": loss.detach().item()})
 
 			validation_loss=0
 			self.model.eval()
@@ -245,6 +230,8 @@ class Trainer(nn.Module):
 
 			validation_loss /= len(validation_loader)
 			self.loss_history["validation"].append(validation_loss)
+			if self.tensorboard:
+				wandb.log({"epoch": epoch, "Validation/Loss": validation_loss})
 
 			if self.verbose:
 				print("Epoch [{}/{}], average_loss:{:.4f}, validation_loss:{:.4f}"\
@@ -256,8 +243,6 @@ class Trainer(nn.Module):
 					self.early_stopping_save(epoch+1)
 				return self.loss_history
 
-			if self.tensorboard:
-				self.tensorboard_save(epoch=epoch, tr_loss=train_loss/n_batches, val_loss=validation_loss)
 			if self.scheduler!=None:
 				self.scheduler.step()
 			if self.save_every[1]:
