@@ -16,7 +16,6 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from .losses import Gaussian_NLL, gaussian_nll, sample_mse
 from .utils import EarlyStopping
 
-
 class Trainer(nn.Module):
 	"""
 	Class Trainer was made for easier training of Neural Networks for classification or regression. 
@@ -126,10 +125,11 @@ class Trainer(nn.Module):
 				loss.backward()
 				self.optimizer.step()
 				#=================log====================
+				if self.tensorboard:
+					wandb.log({"Training/Loss_iterwise": loss.detach().item()})
 				if ((i + 1) % print_every == 0): 
 					self.loss_history["train"].append(loss.item())
-					if self.tensorboard:
-						wandb.log({"Training/Loss": loss.detach().item()})
+
 
 			validation_loss=0
 			preds = []
@@ -150,8 +150,9 @@ class Trainer(nn.Module):
 
 			preds = torch.cat(preds, axis=0)
 			ground_trues = torch.cat(ground_trues, axis=0)	
+			pr = copy.deepcopy(preds)
+			gr = copy.deepcopy(ground_trues)
 			acc = accuracy_score(ground_trues, preds)
-			conf_matrix = confusion_matrix(ground_trues, preds)
 			f1_macro = f1_score(ground_trues, preds, average="macro")
 
 
@@ -160,13 +161,14 @@ class Trainer(nn.Module):
 			acc = np.mean(acc)
 			self.loss_history["val_accuracy"].append(acc)
 			if self.tensorboard:
-				tab = wandb.Table(columns=["pred-"+str(kk) for kk in range(conf_matrix.shape[0])], data=conf_matrix.tolist())#.tolist()
 				wandb.log(
 					{"epoch": epoch, 
+					"Training/Loss_epochwise": train_loss/n_batches,
       				"Validation/Loss": validation_loss, 
 	       			"Validation/Accuracy": acc,
 				    "Validation/F1_score": f1_macro, 
-					"Validation/Confusion_Matrix": tab})
+					#"Validation/Confusion_Matrix": tab
+				})
 
 			if self.verbose:
 				print("Epoch [{}/{}], average_loss:{:.4f}, validation_loss:{:.4f}, val_accuracy:{:,.4f}"\
@@ -189,8 +191,13 @@ class Trainer(nn.Module):
 				early_stop = self.early_stopping(self.model.state_dict(), validation_loss)
 				if early_stop:
 					self.early_stopping_save(epoch+1)
+					if self.tensorboard:
+						wandb.sklearn.plot_confusion_matrix(ground_trues, preds)
 					return self.loss_history
-					
+				
+			if (epoch == max(epochs)) & self.tensorboard:
+				wandb.sklearn.plot_confusion_matrix(ground_trues, preds)
+
 		if self.early_stopping != None:
 			self.early_stopping_save(epoch+1)
 		
