@@ -202,6 +202,7 @@ class Trainer(nn.Module):
 		torch.save(self.model.state_dict(), f"{self.save_path}/{self.model_name}_epoch={epoch+1}_end.pt")
 		return self.loss_history
 	
+	
 	def fit_vae(self, epochs, train_loader, validation_loader, samples=1):
 		""" later can be merged with forward function """
 		n_batches = len(train_loader)
