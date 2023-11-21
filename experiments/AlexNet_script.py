@@ -62,7 +62,7 @@ f = nn.Sequential(
     nn.ReLU(),
     nn.Dropout(p=0.5),
     nn.Linear(4096,1000),
-    nn.Softmax()
+    nn.Softmax(dim=1)
 )
 
 #x,y = next(iter(dataloaders["sup"]))
@@ -91,6 +91,7 @@ trener = Trainer(
 		scheduler=scheduler,
 		tensorboard=True,
 		model_name=model_name,
+		early_stopping=30000,
 		save_path="checkpoints/",
 		verbose=True
 	)
