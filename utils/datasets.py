@@ -68,6 +68,40 @@ def sequence(x, length=160, stride=10):
     tensor = np.moveaxis(tensor.numpy(), [0,1,2], [0,2,1])
     return tensor
 
+
+def load_unseen_test_data(path="../", batch_size=128, stride=10, downsample=10, seq_len=160, label_idx=80, verbose=True):
+	path = os.path.join(path,"data/dataset/")
+	unsup_dataset = list(filter(lambda x: ".csv" in x,os.listdir(os.path.join(path, "unsupervised"))))
+
+	if verbose:
+		print("Processing unsupervised set")
+		unsup_iterator = tqdm(unsup_dataset)
+	else:
+		unsup_iterator = unsup_dataset
+
+	#if "processed_whole_unsup.pt"
+	print("cutting sequences")
+	X_dict = {}
+	for seq in unsup_iterator:
+		_name = seq.split("-")[1].split(".")[0]
+		df_tmp = pd.read_csv(os.path.join(path, "unsupervised", seq))
+		x = df_tmp[["D_alpha", "IPR1", "IPR9", "IPR14", "McB2"]].values
+		x = x[::downsample]
+		x = sequence(x, length=seq_len, stride=stride)
+		y = df_tmp[["labels"]].values
+		y = y[::downsample]
+		y = sequence(y, length=seq_len, stride=stride)
+		X_dict[_name] = (x, y[:,:,label_idx])
+
+	print("building dataloaders")
+	dataloaders = {}
+	for key in tqdm(X_dict.keys()):
+		dataset = SupervisedDataset(X_dict[key][0], X_dict[key][1])
+		dataloaders[key] = torch.utils.data.DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
+
+	return dataloaders
+
+
 def load_and_preprocess(
 		mode="sup", path="../", transform=None, batch_size=128, validation=True, 
 		sub_samples=1.0, balanced=True, downsample=10, seq_len=160, stride=10, 
