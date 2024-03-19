@@ -10,17 +10,16 @@ import torch.nn as nn
 import torch.nn.functional as F 
 
 from utils.inference import Trainer
-from utils.datasets import load_and_preprocess
+from utils.datasets import load_and_preprocess, load_unseen_test_data
 from utils.inception import Inception, InceptionBlock, correct_sizes
 from utils.models import inception_time
 from utils.utils import SWISH, get_activation, H_alpha_only, acc_tst
 
 import utils.datasets as d
 
-
 #1) Nastavit Arguenty
 parser = argparse.ArgumentParser()
-parser.add_argument("--epochs", type=int, default=300, help="number of epochs")
+parser.add_argument("--epochs", type=int, default=300, help="number of epochs")  #epoch=kolikart projedu cely dataset tim modelem, iterace*batch size=cely dataset, tj kolik iteraci v zavilosti na batch size je potreba udelat aby probehla jedna epoch?
 parser.add_argument("--batch_size", type=int, default=128, help="size of each image batch")
 parser.add_argument("--activation", type=str, default="relu", help="activation function")
 parser.add_argument("--lr", type=float, default=3e-3, help="learning rate")
@@ -104,5 +103,10 @@ history = trener(epochs=range(options.epochs), train_loader=dataloaders["sup"], 
 #10) 
 trener.loss_history["seed"] = options.seed
 trener.loss_history["options"] = options
+
+test_discharges=load_unseen_test_data()
+
+for key in test_discharges:
+	ys=[]
 
 

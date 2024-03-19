@@ -218,7 +218,7 @@ def acc_tst(model, data_loaders, split="test"):
 	model.eval()
 	with torch.no_grad():
 		for (x,y) in data_loaders[split]:
-			y_.append(y)
+			y_.append(y.reshape(-1))
 			y_p = model(x)
 			y_pred.append(y_p.argmax(axis=1).numpy())
 		#print(np.mean(np.hstack(y_pred)==np.hstack(y_)))
