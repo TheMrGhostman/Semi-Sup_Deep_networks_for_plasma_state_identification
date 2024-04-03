@@ -16,6 +16,9 @@ from utils.models import inception_time
 from utils.utils import SWISH, get_activation, H_alpha_only, acc_tst
 
 import utils.datasets as d
+import wandb
+import datetime
+import sklearn
 
 #1) Nastavit Arguenty
 parser = argparse.ArgumentParser()
@@ -27,6 +30,7 @@ parser.add_argument("--scheduler", type=str, default="None", help="scheduler par
 parser.add_argument("--sup_samples", type=float, default=1.0, help="ratio of labeled date")
 parser.add_argument("--balanced", type=str, default="True", help="balanced classes within supervised samples")
 parser.add_argument("--seed", type=int, default=666, help="validation split seed")
+parser.add_argument("--ui", type=int, default=np.random.randint(10000), help="unique identifier")
 
 options = parser.parse_args()
 print(options)
@@ -80,7 +84,28 @@ else:
 	scheduler = None
 
 #7) model name
-model_name = f"AlexNet_lr={options.lr}_bs={options.batch_size}_scheduler={options.scheduler}"
+model_name = f"AlexNet_lr={options.lr}_bs={options.batch_size}_scheduler={options.scheduler}_ui={options.ui}"
+#dt = datetime.datetime.now().strftime("%d-%m-%Y--%H-%M-%S--")
+
+run = wandb.init(
+    # Set the project where this run will be logged
+    project="bc-thesis",
+    #name = f"{dt}{model_name}"
+    # Track hyperparameters and run metadata
+    config={
+	"model": "AlexNet",
+	"model_name": model_name,
+        "learning_rate": options.lr,
+        "epochs": options.epochs,
+	"batch_size": options.batch_size,
+	"activation": options.activation,
+	"scheduler": options.scheduler,
+	"sup_samples": options.sup_samples,
+	"balanced": options.balanced,
+	"seed": options.seed,
+	"ui": options.ui
+    },
+)
 
 #8) vytvořit trenéra
 trener = Trainer(
@@ -91,7 +116,7 @@ trener = Trainer(
 		tensorboard=True,
 		model_name=model_name,
 		early_stopping=30000,
-		save_path="checkpoints/",
+		save_path="../checkpoints",
 		verbose=True
 	)
 
@@ -107,6 +132,13 @@ trener.loss_history["options"] = options
 test_discharges=load_unseen_test_data()
 
 for key in test_discharges:
-	ys=[]
+	results = {}
+	y_hat, y = acc_tst(trener.model, test_discharges, key)
+	if len(np.unique(y)) !=1:
+		my_table = wandb.Table(columns=["labels", "predictions"], data=np.vstack([y, y_hat]).transpose())
+		run.log({f"Predictions - {key}": my_table})
+		wandb.config.update({f"Test/Accuracy-{key}": sklearn.metrics.accuracy_score(y,y_hat), f"Test/F1-{key}": sklearn.metrics.f1_score(y,y_hat, average="macro")})
 
+
+torch.save(trener.loss_history, f"../saves/{model_name}.pt")
 
