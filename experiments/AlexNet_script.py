@@ -141,4 +141,4 @@ for key in test_discharges:
 
 
 torch.save(trener.loss_history, f"../saves/{model_name}.pt")
-
+run.finish()
