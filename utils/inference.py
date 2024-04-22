@@ -110,6 +110,7 @@ class Trainer(nn.Module):
 
 		for epoch in epochs:
 			self.model.train()
+			ps_before_epoch = nn.utils.parameters_to_vector(self.model.parameters())
 			train_loss = 0
 			for i, (train_sample, y_true) in enumerate(train_loader, 0):
 				train_sample = train_sample.to(self.device)
@@ -134,6 +135,8 @@ class Trainer(nn.Module):
 			validation_loss=0
 			preds = []
 			ground_trues = []
+			ps_after_epoch = nn.utils.parameters_to_vector(self.model.parameters())
+			ps_norm = torch.norm(ps_before_epoch-ps_after_epoch)
 			self.model.eval()
 			with torch.no_grad():
 				for j, (validation_sample, y_valid_true) in enumerate(validation_loader, 0):
@@ -165,12 +168,13 @@ class Trainer(nn.Module):
       				"Validation/Loss": validation_loss, 
 	       			"Validation/Accuracy": acc,
 				    "Validation/F1_score": f1_macro, 
+					"Parameters/Norm_change": ps_norm
 					#"Validation/Confusion_Matrix": tab
 				})
 
 			if self.verbose:
-				print("Epoch [{}/{}], average_loss:{:.4f}, validation_loss:{:.4f}, val_accuracy:{:,.4f}"\
-						.format(epoch+1, n_epochs, train_loss/n_batches, validation_loss, acc))
+				print("Epoch [{}/{}], average_loss:{:.4f}, validation_loss:{:.4f}, val_accuracy:{:,.4f}, ps_norm_change:{:,.4f}"\
+						.format(epoch+1, n_epochs, train_loss/n_batches, validation_loss, acc, ps_norm))
 			
 			if torch.isnan(torch.tensor(validation_loss)) or torch.isnan(torch.tensor(train_loss)):
 				print("Loss is somehow nan!!")
