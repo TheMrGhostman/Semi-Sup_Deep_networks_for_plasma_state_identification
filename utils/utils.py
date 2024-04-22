@@ -212,15 +212,15 @@ def dict_append(dict_, keys, values):
 	return dict_
 
 
-def acc_tst(model, data_loaders, split="test"):
+def acc_tst(model, data_loaders, split="test", device="cpu"):
 	y_pred=[]
 	y_=[]
 	model.eval()
 	with torch.no_grad():
 		for (x,y) in data_loaders[split]:
 			y_.append(y)
-			y_p = model(x)
-			y_pred.append(y_p.argmax(axis=1).numpy())
+			y_p = model(x.to(device))
+			y_pred.append(y_p.cpu().argmax(axis=1).numpy())
 		#print(np.mean(np.hstack(y_pred)==np.hstack(y_)))
 	return np.hstack(y_pred), np.hstack(y_)
 
